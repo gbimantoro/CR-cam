@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CR DICOM Camera Prototype</title>
+    <title>CR Camera Prototype</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
@@ -13,9 +13,6 @@
             font-family: 'Inter', sans-serif;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-        }
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         .modal-bg {
             background-color: rgba(0,0,0,0.7);
@@ -37,11 +34,16 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        /* Ensure video fills its container */
         #video {
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+        .form-input {
+            @apply w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition;
+        }
+        label {
+            @apply text-sm font-medium text-gray-300;
         }
     </style>
 </head>
@@ -50,7 +52,6 @@
     <div id="main-container" class="w-full max-w-lg p-4 md:p-6">
         <div class="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
             
-            <!-- Header -->
             <div class="p-4 border-b border-gray-700">
                 <h1 class="text-xl font-bold text-center">CR Camera to DICOM</h1>
                 <p class="text-xs text-gray-400 text-center mt-1">Capture & Digitize Analog X-Rays</p>
@@ -68,7 +69,7 @@
 
             <!-- App State: Camera View -->
             <div id="camera-view" class="hidden">
-                <div class="relative bg-black rounded-lg overflow-hidden aspect-video">
+                <div class="relative bg-black rounded-lg overflow-hidden aspect-[4/5] mx-auto max-w-sm">
                     <video id="video" playsinline autoplay muted></video>
                 </div>
                 <div class="p-4">
@@ -80,7 +81,44 @@
             </div>
             
             <!-- App State: Editor View -->
-            <div id="editor-view" class="hidden p-4">
+            <div id="editor-view" class="hidden p-4 space-y-4">
+                <!-- Metadata Form -->
+                <div id="metadata-form" class="space-y-3 p-3 bg-gray-900/50 rounded-lg">
+                    <h3 class="text-lg font-semibold text-white">Patient Metadata</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label for="full-name">Full Name <span class="text-red-400">*</span></label>
+                            <input type="text" id="full-name" class="form-input mt-1">
+                        </div>
+                        <div>
+                            <label for="patient-id">Patient ID <span class="text-red-400">*</span></label>
+                            <input type="text" id="patient-id" class="form-input mt-1">
+                        </div>
+                        <div>
+                            <label for="dob">Date of Birth <span class="text-red-400">*</span></label>
+                            <input type="date" id="dob" class="form-input mt-1">
+                        </div>
+                        <div>
+                            <label for="gender">Gender <span class="text-red-400">*</span></label>
+                            <select id="gender" class="form-input mt-1">
+                                <option value="">Select...</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label for="study-date">Study Date</label>
+                            <input type="date" id="study-date" class="form-input mt-1">
+                        </div>
+                         <div>
+                            <label for="ref-physician">Referring Physician</label>
+                            <input type="text" id="ref-physician" class="form-input mt-1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Editor -->
                 <div>
                     <img id="captured-image" class="max-w-full rounded-lg">
                 </div>
@@ -90,11 +128,11 @@
                 </div>
                 <div class="mt-4 space-y-3">
                     <div>
-                        <label for="brightness-slider" class="text-sm font-medium">Brightness</label>
+                        <label for="brightness-slider">Brightness</label>
                         <input id="brightness-slider" type="range" min="0" max="200" value="100" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
                     </div>
                      <div>
-                        <label for="contrast-slider" class="text-sm font-medium">Contrast</label>
+                        <label for="contrast-slider">Contrast</label>
                         <input id="contrast-slider" type="range" min="0" max="200" value="100" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
                     </div>
                 </div>
@@ -104,10 +142,9 @@
                 </div>
                 <div class="mt-6 flex gap-4">
                     <button id="recapture-btn" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg transition-all">Recapture</button>
-                    <button id="finalize-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all">Finalize & Upload</button>
+                    <button id="finalize-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all disabled:bg-gray-500 disabled:cursor-not-allowed" disabled>Finalize & Upload</button>
                 </div>
             </div>
-
         </div>
     </div>
 
@@ -122,7 +159,7 @@
             <div id="upload-success" class="hidden">
                 <svg class="w-16 h-16 mx-auto text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 <h2 class="text-xl font-semibold mt-4">Upload Complete</h2>
-                <p class="text-gray-400 text-sm mt-1">The digitized X-Ray has been successfully sent to the teleradiology platform.</p>
+                <p class="text-gray-400 text-sm mt-1">The digitized X-Ray has been successfully sent.</p>
                 <button id="start-over-btn" class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Scan Another</button>
             </div>
         </div>
@@ -145,13 +182,21 @@
     const uploadSpinner = document.getElementById('upload-spinner');
     const uploadSuccess = document.getElementById('upload-success');
     
+    // Form Inputs
+    const metadataForm = document.getElementById('metadata-form');
+    const fullNameInput = document.getElementById('full-name');
+    const patientIdInput = document.getElementById('patient-id');
+    const dobInput = document.getElementById('dob');
+    const genderInput = document.getElementById('gender');
+    const studyDateInput = document.getElementById('study-date');
+    const refPhysicianInput = document.getElementById('ref-physician');
+
     // Sliders
     const brightnessSlider = document.getElementById('brightness-slider');
     const contrastSlider = document.getElementById('contrast-slider');
 
     let cropper = null;
     let stream = null;
-    let originalImageDataURL = null;
 
     // --- State Management ---
     function showState(state) {
@@ -167,21 +212,18 @@
     startCameraBtn.addEventListener('click', async () => {
         try {
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' } // Prefer back camera
+                video: { facingMode: 'environment' }
             });
             video.srcObject = stream;
             showState('camera');
             startStabilityCheck();
         } catch (err) {
             console.error("Error accessing camera: ", err);
-            alert("Could not access the camera. Please ensure you have given permission and are using a secure (HTTPS) connection.");
+            alert("Could not access camera. Please grant permission and use a secure (HTTPS) connection.");
         }
     });
 
     function startStabilityCheck() {
-        // This is a simplified simulation of image stabilization.
-        // In a real app, you'd use accelerometer data.
-        // Here, we just enable the button after a short delay.
         setTimeout(() => {
             stabilityIndicator.textContent = '✅ Ready to Capture';
             stabilityIndicator.classList.add('text-green-400');
@@ -196,18 +238,15 @@
         const context = canvas.getContext('2d');
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        originalImageDataURL = canvas.toDataURL('image/jpeg');
-        capturedImage.src = originalImageDataURL;
+        capturedImage.src = canvas.toDataURL('image/jpeg');
         
         stopCamera();
         showState('editor');
-        initializeCropper();
+        initializeEditor();
     });
 
     function stopCamera() {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
+        if (stream) stream.getTracks().forEach(track => track.stop());
         stream = null;
         video.srcObject = null;
         captureBtn.disabled = true;
@@ -216,36 +255,51 @@
     }
 
     recaptureBtn.addEventListener('click', () => {
-        if (cropper) {
-            cropper.destroy();
-            cropper = null;
-        }
+        if (cropper) cropper.destroy();
+        cropper = null;
+        resetForm();
         showState('initial');
     });
 
-    // --- Editor Logic ---
+    // --- Editor & Form Logic ---
+    function initializeEditor() {
+        initializeCropper();
+        resetForm();
+        setupFormValidation();
+    }
+
     function initializeCropper() {
-        if (cropper) {
-            cropper.destroy();
-        }
+        if (cropper) cropper.destroy();
         cropper = new Cropper(capturedImage, {
-            viewMode: 1,
-            dragMode: 'move',
-            autoCropArea: 0.9,
-            background: false,
-            responsive: true,
-            restore: false,
-            guides: false,
-            center: false,
-            highlight: false,
-            cropBoxMovable: true,
-            cropBoxResizable: true,
+            viewMode: 1, dragMode: 'move', autoCropArea: 0.9, background: false,
+            responsive: true, restore: false, guides: false, center: false,
+            highlight: false, cropBoxMovable: true, cropBoxResizable: true,
         });
     }
 
+    function resetForm() {
+        metadataForm.reset();
+        const today = new Date().toISOString().split('T')[0];
+        studyDateInput.value = today;
+        finalizeBtn.disabled = true;
+    }
+
+    function validateForm() {
+        const isFormValid = fullNameInput.value.trim() !== '' &&
+                            patientIdInput.value.trim() !== '' &&
+                            dobInput.value !== '' &&
+                            genderInput.value !== '';
+        finalizeBtn.disabled = !isFormValid;
+    }
+
+    function setupFormValidation() {
+        [fullNameInput, patientIdInput, dobInput, genderInput].forEach(input => {
+            input.addEventListener('input', validateForm);
+        });
+    }
+    
     function applyFilter(filterType) {
         if (!cropper) return;
-
         const canvas = cropper.getCroppedCanvas();
         const ctx = canvas.getContext('2d');
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -254,12 +308,9 @@
         if (filterType === 'grayscale') {
             for (let i = 0; i < data.length; i += 4) {
                 const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                data[i] = avg; // red
-                data[i + 1] = avg; // green
-                data[i + 2] = avg; // blue
+                data[i] = data[i + 1] = data[i + 2] = avg;
             }
         } else if (filterType === 'autoContrast') {
-            // Simple auto-contrast: find min and max brightness and stretch the histogram
             let min = 255, max = 0;
             for (let i = 0; i < data.length; i += 4) {
                 const grayscale = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
@@ -275,54 +326,54 @@
                 }
             }
         }
-        
         ctx.putImageData(imageData, 0, 0);
-        
-        // Update the cropper with the modified image
-        const newSrc = canvas.toDataURL();
-        cropper.replace(newSrc);
+        cropper.replace(canvas.toDataURL());
     }
     
-    function updateFilters() {
+    function updateImageStyleFilters() {
         if (!cropper) return;
         const brightness = brightnessSlider.value;
         const contrast = contrastSlider.value;
-        capturedImage.style.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+        // Cropper's image element is inside a container, we need to target it.
+        const cropperImage = editorViewDiv.querySelector('.cropper-canvas img');
+        if (cropperImage) {
+            cropperImage.style.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+        }
     }
 
-    brightnessSlider.addEventListener('input', updateFilters);
-    contrastSlider.addEventListener('input', updateFilters);
+    brightnessSlider.addEventListener('input', updateImageStyleFilters);
+    contrastSlider.addEventListener('input', updateImageStyleFilters);
 
     // --- Finalize & Upload Logic ---
     finalizeBtn.addEventListener('click', () => {
+        const metadata = {
+            fullName: fullNameInput.value,
+            patientId: patientIdInput.value,
+            dob: dobInput.value,
+            gender: genderInput.value,
+            studyDate: studyDateInput.value,
+            refPhysician: refPhysicianInput.value
+        };
+        console.log("Finalizing with metadata:", metadata);
+        // In a real app, this metadata and the image blob would be sent to the backend.
+
         uploadModal.classList.remove('hidden');
         uploadSpinner.classList.remove('hidden');
         uploadSuccess.classList.add('hidden');
         
-        // This is a simulation.
-        // In a real app, you would get the final canvas blob:
-        // cropper.getCroppedCanvas().toBlob(blob => {
-        //   // Then you would send this 'blob' to your backend server.
-        //   // The server would then use a DICOM library (like DCMTK, pydicom)
-        //   // to create a valid DICOM file and send it to the PACS/teleradiology platform.
-        // });
-        
         setTimeout(() => {
             uploadSpinner.classList.add('hidden');
             uploadSuccess.classList.remove('hidden');
-        }, 2500); // Simulate network and processing delay
+        }, 2500);
     });
     
     startOverBtn.addEventListener('click', () => {
         uploadModal.classList.add('hidden');
-        if (cropper) {
-            cropper.destroy();
-            cropper = null;
-        }
-        // Reset sliders and filters
+        if (cropper) cropper.destroy();
+        cropper = null;
         brightnessSlider.value = 100;
         contrastSlider.value = 100;
-        capturedImage.style.filter = '';
+        resetForm();
         showState('initial');
     });
 
