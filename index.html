@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CR DICOM Camera Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .modal-bg {
+            background-color: rgba(0,0,0,0.7);
+        }
+        .cropper-view-box,
+        .cropper-face {
+            border-radius: 0.5rem;
+        }
+        .loader {
+            border-top-color: #3498db;
+            -webkit-animation: spin 1s linear infinite;
+            animation: spin 1s linear infinite;
+        }
+        @-webkit-keyframes spin {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Ensure video fills its container */
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+
+    <div id="main-container" class="w-full max-w-lg p-4 md:p-6">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+            
+            <!-- Header -->
+            <div class="p-4 border-b border-gray-700">
+                <h1 class="text-xl font-bold text-center">CR Camera to DICOM</h1>
+                <p class="text-xs text-gray-400 text-center mt-1">Capture & Digitize Analog X-Rays</p>
+            </div>
+
+            <!-- App State: Initial -->
+            <div id="initial-state" class="p-6 text-center">
+                <svg class="w-16 h-16 mx-auto text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <h2 class="mt-4 text-lg font-semibold">Ready to Scan</h2>
+                <p class="text-gray-400 mt-1 text-sm">Please point your camera at a well-lit X-Ray film.</p>
+                <button id="start-camera-btn" class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105">
+                    Start Camera
+                </button>
+            </div>
+
+            <!-- App State: Camera View -->
+            <div id="camera-view" class="hidden">
+                <div class="relative bg-black rounded-lg overflow-hidden aspect-video">
+                    <video id="video" playsinline autoplay muted></video>
+                </div>
+                <div class="p-4">
+                    <p id="stability-indicator" class="text-center text-sm mb-4">Move camera to focus...</p>
+                    <button id="capture-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105" disabled>
+                        Capture Image
+                    </button>
+                </div>
+            </div>
+            
+            <!-- App State: Editor View -->
+            <div id="editor-view" class="hidden p-4">
+                <div>
+                    <img id="captured-image" class="max-w-full rounded-lg">
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-4">
+                     <button onclick="applyFilter('grayscale')" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">Grayscale</button>
+                     <button onclick="applyFilter('autoContrast')" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">Auto Contrast</button>
+                </div>
+                <div class="mt-4 space-y-3">
+                    <div>
+                        <label for="brightness-slider" class="text-sm font-medium">Brightness</label>
+                        <input id="brightness-slider" type="range" min="0" max="200" value="100" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                     <div>
+                        <label for="contrast-slider" class="text-sm font-medium">Contrast</label>
+                        <input id="contrast-slider" type="range" min="0" max="200" value="100" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+                 <div class="mt-4 grid grid-cols-2 gap-4">
+                    <button onclick="cropper.rotate(-90)" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">Rotate Left</button>
+                    <button onclick="cropper.rotate(90)" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">Rotate Right</button>
+                </div>
+                <div class="mt-6 flex gap-4">
+                    <button id="recapture-btn" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg transition-all">Recapture</button>
+                    <button id="finalize-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all">Finalize & Upload</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal for Uploading/Success -->
+    <div id="upload-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl p-8 text-center max-w-sm w-full">
+            <div id="upload-spinner">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto"></div>
+                <h2 class="text-xl font-semibold mt-4">Processing & Uploading...</h2>
+                <p class="text-gray-400 text-sm mt-1">Converting to DICOM and sending to platform.</p>
+            </div>
+            <div id="upload-success" class="hidden">
+                <svg class="w-16 h-16 mx-auto text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <h2 class="text-xl font-semibold mt-4">Upload Complete</h2>
+                <p class="text-gray-400 text-sm mt-1">The digitized X-Ray has been successfully sent to the teleradiology platform.</p>
+                <button id="start-over-btn" class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Scan Another</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // UI Elements
+    const initialStateDiv = document.getElementById('initial-state');
+    const cameraViewDiv = document.getElementById('camera-view');
+    const editorViewDiv = document.getElementById('editor-view');
+    const startCameraBtn = document.getElementById('start-camera-btn');
+    const captureBtn = document.getElementById('capture-btn');
+    const recaptureBtn = document.getElementById('recapture-btn');
+    const finalizeBtn = document.getElementById('finalize-btn');
+    const startOverBtn = document.getElementById('start-over-btn');
+    const video = document.getElementById('video');
+    const capturedImage = document.getElementById('captured-image');
+    const stabilityIndicator = document.getElementById('stability-indicator');
+    const uploadModal = document.getElementById('upload-modal');
+    const uploadSpinner = document.getElementById('upload-spinner');
+    const uploadSuccess = document.getElementById('upload-success');
+    
+    // Sliders
+    const brightnessSlider = document.getElementById('brightness-slider');
+    const contrastSlider = document.getElementById('contrast-slider');
+
+    let cropper = null;
+    let stream = null;
+    let originalImageDataURL = null;
+
+    // --- State Management ---
+    function showState(state) {
+        initialStateDiv.classList.add('hidden');
+        cameraViewDiv.classList.add('hidden');
+        editorViewDiv.classList.add('hidden');
+        if (state === 'initial') initialStateDiv.classList.remove('hidden');
+        else if (state === 'camera') cameraViewDiv.classList.remove('hidden');
+        else if (state === 'editor') editorViewDiv.classList.remove('hidden');
+    }
+
+    // --- Camera & Capture Logic ---
+    startCameraBtn.addEventListener('click', async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' } // Prefer back camera
+            });
+            video.srcObject = stream;
+            showState('camera');
+            startStabilityCheck();
+        } catch (err) {
+            console.error("Error accessing camera: ", err);
+            alert("Could not access the camera. Please ensure you have given permission and are using a secure (HTTPS) connection.");
+        }
+    });
+
+    function startStabilityCheck() {
+        // This is a simplified simulation of image stabilization.
+        // In a real app, you'd use accelerometer data.
+        // Here, we just enable the button after a short delay.
+        setTimeout(() => {
+            stabilityIndicator.textContent = '✅ Ready to Capture';
+            stabilityIndicator.classList.add('text-green-400');
+            captureBtn.disabled = false;
+        }, 1500);
+    }
+
+    captureBtn.addEventListener('click', () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        originalImageDataURL = canvas.toDataURL('image/jpeg');
+        capturedImage.src = originalImageDataURL;
+        
+        stopCamera();
+        showState('editor');
+        initializeCropper();
+    });
+
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+        stream = null;
+        video.srcObject = null;
+        captureBtn.disabled = true;
+        stabilityIndicator.textContent = 'Move camera to focus...';
+        stabilityIndicator.classList.remove('text-green-400');
+    }
+
+    recaptureBtn.addEventListener('click', () => {
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
+        showState('initial');
+    });
+
+    // --- Editor Logic ---
+    function initializeCropper() {
+        if (cropper) {
+            cropper.destroy();
+        }
+        cropper = new Cropper(capturedImage, {
+            viewMode: 1,
+            dragMode: 'move',
+            autoCropArea: 0.9,
+            background: false,
+            responsive: true,
+            restore: false,
+            guides: false,
+            center: false,
+            highlight: false,
+            cropBoxMovable: true,
+            cropBoxResizable: true,
+        });
+    }
+
+    function applyFilter(filterType) {
+        if (!cropper) return;
+
+        const canvas = cropper.getCroppedCanvas();
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        if (filterType === 'grayscale') {
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                data[i] = avg; // red
+                data[i + 1] = avg; // green
+                data[i + 2] = avg; // blue
+            }
+        } else if (filterType === 'autoContrast') {
+            // Simple auto-contrast: find min and max brightness and stretch the histogram
+            let min = 255, max = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                const grayscale = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                if (grayscale < min) min = grayscale;
+                if (grayscale > max) max = grayscale;
+            }
+            const range = max - min;
+            if (range > 0) {
+                 for (let i = 0; i < data.length; i += 4) {
+                    data[i] = 255 * (data[i] - min) / range;
+                    data[i+1] = 255 * (data[i+1] - min) / range;
+                    data[i+2] = 255 * (data[i+2] - min) / range;
+                }
+            }
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Update the cropper with the modified image
+        const newSrc = canvas.toDataURL();
+        cropper.replace(newSrc);
+    }
+    
+    function updateFilters() {
+        if (!cropper) return;
+        const brightness = brightnessSlider.value;
+        const contrast = contrastSlider.value;
+        capturedImage.style.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+    }
+
+    brightnessSlider.addEventListener('input', updateFilters);
+    contrastSlider.addEventListener('input', updateFilters);
+
+    // --- Finalize & Upload Logic ---
+    finalizeBtn.addEventListener('click', () => {
+        uploadModal.classList.remove('hidden');
+        uploadSpinner.classList.remove('hidden');
+        uploadSuccess.classList.add('hidden');
+        
+        // This is a simulation.
+        // In a real app, you would get the final canvas blob:
+        // cropper.getCroppedCanvas().toBlob(blob => {
+        //   // Then you would send this 'blob' to your backend server.
+        //   // The server would then use a DICOM library (like DCMTK, pydicom)
+        //   // to create a valid DICOM file and send it to the PACS/teleradiology platform.
+        // });
+        
+        setTimeout(() => {
+            uploadSpinner.classList.add('hidden');
+            uploadSuccess.classList.remove('hidden');
+        }, 2500); // Simulate network and processing delay
+    });
+    
+    startOverBtn.addEventListener('click', () => {
+        uploadModal.classList.add('hidden');
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
+        // Reset sliders and filters
+        brightnessSlider.value = 100;
+        contrastSlider.value = 100;
+        capturedImage.style.filter = '';
+        showState('initial');
+    });
+
+    // Initialize
+    showState('initial');
+
+</script>
+</body>
+</html>
