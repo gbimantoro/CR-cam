@@ -34,7 +34,7 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        #video {
+        #video, #captured-image {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -69,7 +69,6 @@
 
             <!-- App State: Camera View -->
             <div id="camera-view" class="hidden">
-                <!-- Changed aspect ratio here -->
                 <div class="relative bg-black rounded-lg overflow-hidden aspect-[6/5] mx-auto max-w-sm">
                     <video id="video" playsinline autoplay muted></video>
                 </div>
@@ -120,8 +119,8 @@
                 </div>
 
                 <!-- Image Editor -->
-                <div>
-                    <img id="captured-image" class="max-w-full rounded-lg">
+                <div class="relative bg-black rounded-lg overflow-hidden aspect-[6/5] mx-auto max-w-sm">
+                    <img id="captured-image" class="block w-full h-full">
                 </div>
                 <div class="mt-4 grid grid-cols-2 gap-4">
                      <button onclick="applyFilter('grayscale')" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">Grayscale</button>
@@ -336,9 +335,9 @@
         const brightness = brightnessSlider.value;
         const contrast = contrastSlider.value;
         // Cropper's image element is inside a container, we need to target it.
-        const cropperImage = editorViewDiv.querySelector('.cropper-canvas img');
-        if (cropperImage) {
-            cropperImage.style.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+        const cropperImageContainer = editorViewDiv.querySelector('.cropper-canvas');
+        if (cropperImageContainer) {
+            cropperImageContainer.style.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
         }
     }
 
