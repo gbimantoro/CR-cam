@@ -83,7 +83,8 @@
             <!-- App State: Editor View -->
             <div id="editor-view" class="hidden p-4 space-y-4">
                 <!-- Metadata Form -->
-                <div id="metadata-form" class="space-y-3 p-3 bg-gray-900/50 rounded-lg">
+                <!-- Changed div to form tag to allow .reset() method to work -->
+                <form id="metadata-form" class="space-y-3 p-3 bg-gray-900/50 rounded-lg">
                     <h3 class="text-lg font-semibold text-white">Patient Metadata</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -116,7 +117,7 @@
                             <input type="text" id="ref-physician" class="form-input mt-1">
                         </div>
                     </div>
-                </div>
+                </form>
 
                 <!-- Image Editor -->
                 <div class="relative bg-black rounded-lg overflow-hidden aspect-[6/5] mx-auto max-w-sm">
@@ -219,7 +220,8 @@
             startStabilityCheck();
         } catch (err) {
             console.error("Error accessing camera: ", err);
-            alert("Could not access camera. Please grant permission and use a secure (HTTPS) connection.");
+            // Replaced alert with a console log as alerts are not ideal.
+            console.error("Could not access camera. Please grant permission and use a secure (HTTPS) connection.");
         }
     });
 
@@ -278,7 +280,9 @@
     }
 
     function resetForm() {
-        metadataForm.reset();
+        if (metadataForm) {
+            metadataForm.reset();
+        }
         const today = new Date().toISOString().split('T')[0];
         studyDateInput.value = today;
         finalizeBtn.disabled = true;
@@ -301,6 +305,7 @@
     function applyFilter(filterType) {
         if (!cropper) return;
         const canvas = cropper.getCroppedCanvas();
+        if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
