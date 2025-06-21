@@ -39,12 +39,21 @@
             height: 100%;
             object-fit: cover;
         }
+        /* Updated form input styling for black text on white background */
         .form-input {
-            @apply w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition;
+            @apply w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition;
         }
         label {
             @apply text-sm font-medium text-gray-300;
         }
+        /* More specific rule to ensure all input text is black */
+        select.form-input, input[type="date"].form-input, input[type="text"].form-input {
+            color: black;
+        }
+        input[type="date"] {
+            color-scheme: light;
+        }
+
     </style>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
@@ -59,6 +68,7 @@
 
             <!-- App State: Initial -->
             <div id="initial-state" class="p-6 text-center">
+                <!-- Reverted Icon back to Camera -->
                 <svg class="w-16 h-16 mx-auto text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <h2 class="mt-4 text-lg font-semibold">Ready to Scan</h2>
                 <p class="text-gray-400 mt-1 text-sm">Please point your camera at a well-lit X-Ray film.</p>
@@ -83,7 +93,6 @@
             <!-- App State: Editor View -->
             <div id="editor-view" class="hidden p-4 space-y-4">
                 <!-- Metadata Form -->
-                <!-- Changed div to form tag to allow .reset() method to work -->
                 <form id="metadata-form" class="space-y-3 p-3 bg-gray-900/50 rounded-lg">
                     <h3 class="text-lg font-semibold text-white">Patient Metadata</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -220,7 +229,6 @@
             startStabilityCheck();
         } catch (err) {
             console.error("Error accessing camera: ", err);
-            // Replaced alert with a console log as alerts are not ideal.
             console.error("Could not access camera. Please grant permission and use a secure (HTTPS) connection.");
         }
     });
@@ -234,11 +242,30 @@
     }
 
     captureBtn.addEventListener('click', () => {
+        // This logic crops the captured image to match the viewport aspect ratio
+        const videoRatio = video.videoWidth / video.videoHeight;
+        const targetRatio = 6 / 5;
+        let sx, sy, sWidth, sHeight;
+
+        // Determine crop parameters based on video and target aspect ratios
+        if (videoRatio > targetRatio) { // Video is wider than target
+            sHeight = video.videoHeight;
+            sWidth = video.videoHeight * targetRatio;
+            sx = (video.videoWidth - sWidth) / 2;
+            sy = 0;
+        } else { // Video is taller than or same as target
+            sWidth = video.videoWidth;
+            sHeight = video.videoWidth / targetRatio;
+            sx = 0;
+            sy = (video.videoHeight - sHeight) / 2;
+        }
+
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        canvas.width = sWidth;
+        canvas.height = sHeight;
         const context = canvas.getContext('2d');
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Draw the cropped portion of the video onto the canvas
+        context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
         
         capturedImage.src = canvas.toDataURL('image/jpeg');
         
@@ -273,9 +300,9 @@
     function initializeCropper() {
         if (cropper) cropper.destroy();
         cropper = new Cropper(capturedImage, {
-            viewMode: 1, dragMode: 'move', autoCropArea: 0.9, background: false,
-            responsive: true, restore: false, guides: false, center: false,
-            highlight: false, cropBoxMovable: true, cropBoxResizable: true,
+            viewMode: 1, dragMode: 'move', autoCropArea: 1, // Start with full image
+            background: false, responsive: true, restore: false, guides: false,
+            center: false, highlight: false, cropBoxMovable: true, cropBoxResizable: true,
         });
     }
 
@@ -285,6 +312,8 @@
         }
         const today = new Date().toISOString().split('T')[0];
         studyDateInput.value = today;
+        // Set default date for Date of Birth
+        dobInput.value = '2000-01-01';
         finalizeBtn.disabled = true;
     }
 
@@ -339,8 +368,7 @@
         if (!cropper) return;
         const brightness = brightnessSlider.value;
         const contrast = contrastSlider.value;
-        // Cropper's image element is inside a container, we need to target it.
-        const cropperImageContainer = editorViewDiv.querySelector('.cropper-canvas');
+        const cropperImageContainer = editorView_div.querySelector('.cropper-canvas');
         if (cropperImageContainer) {
             cropperImageContainer.style.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
         }
